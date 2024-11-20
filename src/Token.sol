@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ERC20Burnable, ERC20} from "lib/openzeppelin-solidity/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+// ERC20Brunable inherits ERC20 so effectively have both functionality 
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 
 /// @title Token Contract
 /// @notice A burnable ERC20 token with a deployer-controlled minting mechanism.
@@ -13,12 +14,14 @@ contract Token is ERC20Burnable {
     error OnlyDeployerCanMint();
 
     /**
-     * @notice Constructor to initialize the token with a name and symbol.
+     * @notice Constructor to initialize the token with a name, symbol, and a single minted token.
+     * @dev Mints 1 token to the deployer upon deployment to prevent division by zero errors in token operations.
      * @param name The name of the token.
      * @param symbol The symbol of the token.
      */
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {
         i_deployer = msg.sender;
+        _mint(msg.sender, 1 * 10 ** 18); // Mint 1 token to avoid potential division by zero issues
     }
 
     /**
@@ -29,7 +32,8 @@ contract Token is ERC20Burnable {
      */
     function mint(address to, uint256 amount) external {
         require(msg.sender == i_deployer, OnlyDeployerCanMint());
-        _mint(to, amount);
+        uint256 mintAmount = amount * 10 ** 18;
+        _mint(to, mintAmount);
     }
 
     fallback() external {
