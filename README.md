@@ -60,6 +60,9 @@ forge build
 
 ## FourMarket Contract
 
+### Deployment (Sepolia)
+- (0x1c6AbAaf5b8a410Ae89d30C84a0123173DaabfA3)[https://sepolia.etherscan.io/address/0x1c6abaaf5b8a410ae89d30c84a0123173daabfa3]
+
 ### Purpose
 
 - Acts as a factory and registry for creating and managing individual prediction markets.
