@@ -113,10 +113,22 @@ contract FourMarket is Ownable {
         }
     }
 
-    // Get a market's details
-    function getMarket(uint256 marketId) external view returns (Market) {
-        return markets[marketId];
-    }
+        // Get all markets' details
+        function getAllMarkets() external view returns (Market[] memory) {
+
+            // Create an array to hold all the active markets
+            Market[] memory activeMarkets = new Market[](nextMarketId);
+
+            // Populate the array with all market instances
+            for (uint256 i = 0; i < nextMarketId; i++) {
+                activeMarkets[i] = markets[i];
+                }
+
+            // Return the array of all active markets
+            return activeMarkets;
+        
+        }
+
 
     // Event to log the placement of a bet
     event BetPlaced(address indexed user, uint256 tokenAmount, Market.outcomeType betOutcome);
