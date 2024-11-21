@@ -152,6 +152,8 @@ forge build
 
 ## Note
 
-- The `Token` contract no longer mints an initial token upon deployment. This means that initial token supplies start at zero, and calculations involving total supply should account for this to avoid division by zero errors.
+- The code may contain vulnerabilities or bugs that could result in loss of funds if deployed in a live environment.
+- Critical features such as advanced error handling, edge-case coverage, and comprehensive testing are not implemented.
+- The contracts are designed for educational purposes and should not be relied upon for real-world applications.
 
 ---
