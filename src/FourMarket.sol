@@ -1,10 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// we could add erc20s, appeal system, other types of markets, web ui, tests, fees, deposit to prevent spam, bad stuff (ownable, uups)
-// resolver can be a eoa, an oracle, a llm....
-// consider rewriting in yul with differential testing
-
 import {Market} from "./Market.sol";
 
 contract FourMarket {
