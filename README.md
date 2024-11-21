@@ -4,14 +4,8 @@
 - [Prerequisites](#prerequisites)
 - [Quickstart](#quickstart)
 - [FourMarket Contract](#fourmarket-contract)
-  - [Purpose](#fourmarket-contract-purpose)
-  - [How It Works](#fourmarket-contract-how-it-works)
 - [Market Contract](#market-contract)
-  - [Purpose](#market-contract-purpose)
-  - [Key Features](#market-contract-key-features)
 - [Token Contract](#token-contract)
-  - [Purpose](#token-contract-purpose)
-  - [Key Features](#token-contract-key-features)
 - [User Actions](#user-actions)
 - [Summary](#summary)
 - [Note](#note)
@@ -51,7 +45,7 @@ Follow the steps below to set up the project locally:
 
 ```bash
 # Clone the repository
-git clone https://github.com/monnidev/4Market.git
+git clone https://github.com/group4market/4Market.git
 
 # Navigate to the project directory
 cd 4Market
