@@ -1,105 +1,123 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-// we could add erc20s, appeal system, other types of markets, web ui, tests, fees, deposit to prevent spam, bad stuff (ownable, uups)
-// resolver can be a eoa, an oracle, a llm....
-// consider rewriting in yul with differential testing
+import "./Market.sol";  // Import the Market contract
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-import {Market} from "./Market.sol";
+contract FourMarket is Ownable {
+    // State variables
+    mapping(uint256 => Market) public markets; // Store markets by marketId
+    uint256 public nextMarketId; // Incrementing market ID
+    mapping(uint256 => mapping(address => uint256)) public userBets; // Track bets by market and user
 
-contract FourMarket {
-    /// @notice Mapping of market IDs to their respective Market contracts.
-    mapping(uint256 => Market) public markets;
-
-    /// @dev Tracks the next market ID to be assigned.
-    uint256 public s_nextMarketId;
-
-    /// @notice Event emitted upon the creation of a new market.
-    /// @param marketId The ID of the newly created market.
-    /// @param question The question associated with the market.
-    /// @param details Additional details about the market.
-    /// @param deadline The closing timestamp for new participants.
-    /// @param resolutionTime Expected resolution timestamp for the market.
-    /// @param resolver Address of the entity responsible for resolving the market.
     event MarketCreated(
-        uint256 indexed marketId,
+        uint256 marketId,
+        address marketAddress,
         string question,
         string details,
         uint256 deadline,
         uint256 resolutionTime,
-        address indexed resolver
+        address resolver
     );
 
-    /// @dev Custom error for cases where a market ID does not exist.
-    error MarketIdDoesNotExist();
+    IToken public token; // token contract instance
 
-    /**
-     * @notice Creates a new market with the specified parameters.
-     * @param _question The question for the market.
-     * @param _details Additional details about the market.
-     * @param _deadline The timestamp by which the market closes for new participants.
-     * @param _resolutionTime The time by which the market is expected to be resolved.
-     * @param _resolver Address of the entity responsible for resolving the market.
-     */
+    constructor(address _token) Ownable(msg.sender) {
+        token = IToken(_token);
+        nextMarketId = 0; // Start marketId from 0
+    }
+
     function createMarket(
         string memory _question,
         string memory _details,
         uint256 _deadline,
         uint256 _resolutionTime,
         address _resolver
-    ) external returns (Market) {
-        uint256 _nextMarketId = s_nextMarketId;
-        Market market = new Market(_nextMarketId, _question, _details, _deadline, _resolutionTime, _resolver);
-        markets[_nextMarketId] = market;
-        s_nextMarketId++;
+    ) public onlyOwner {
+        uint256 marketId = nextMarketId++;
+        Market newMarket = new Market(
+            marketId,
+            _question,
+            _details,
+            _deadline,
+            _resolutionTime,
+            _resolver,
+            address(token),  // An instance of the token contract
+            address(token)   // Same token used for both Yes and No tokens
+        );
 
-        // Emit the MarketCreated event with relevant details
-        emit MarketCreated(_nextMarketId, _question, _details, _deadline, _resolutionTime, _resolver);
-        return market;
+        markets[marketId] = newMarket;
+        emit MarketCreated(marketId, address(newMarket), _question, _details, _deadline, _resolutionTime, _resolver);
     }
 
-    /**
-     * @notice Retrieves the details of a deployed market by its ID.
-     * @dev Due to this function --via-ir is required to avoid 'Stack too deep' errors.
-     * @param _marketId The ID of the market to retrieve.
-     * @return router Address of the router associated with the market.
-     * @return marketId ID of the market.
-     * @return balance Current balance of the market.
-     * @return question The question being addressed in the market.
-     * @return details Additional details about the market.
-     * @return deadline Deadline timestamp for market participation.
-     * @return resolutionTime Time at which the market is expected to be resolved.
-     * @return resolver Address of the resolver for the market.
-     * @return resolved Indicates if the market has been resolved.
-     * @return resolvedDate Timestamp of when the market was resolved.
-     * @return finalResolution The final resolution outcome of the market.
-     * @return yesToken Address of the "yes" token for the market.
-     * @return noToken Address of the "no" token for the market.
-     */
-    function getDeployedMarket(uint256 _marketId)
-        external
-        view
-        returns (
-            address,
-            uint256,
-            uint256,
-            string memory,
-            string memory,
-            uint256,
-            uint256,
-            address,
-            bool,
-            uint256,
-            Market.outcomeType,
-            address,
-            address
-        )
-    {
-        require(_marketId < s_nextMarketId, MarketIdDoesNotExist());
-        return markets[_marketId].getMarketDetails();
+    // Betting function to place a bet on a market
+    function betOnMarket(uint256 marketId, Market.outcomeType _betOutcome) external payable {
+        // Ensure the betAmount is greater than a threshold (e.g., 0.001 ETH = 1e15 Wei)
+        require(msg.value >= 0.001 ether, "Bet amount is too low");
+
+        // Retrieve the market instance
+        Market market = markets[marketId];
+
+        // Call the bet function on the Market contract
+        market.bet(_betOutcome);
+
+        // Mint tokens for the user based on their bet (ETH to token conversion)
+        uint256 tokensToMint = MarketLib.getTokensForETH(msg.value);  // Assuming this is how you convert ETH to tokens
+
+        if (_betOutcome == Market.outcomeType.Yes) {
+            // Mint "Yes" tokens
+            token.mint(msg.sender, tokensToMint);
+        } else if (_betOutcome == Market.outcomeType.No) {
+            // Mint "No" tokens
+            token.mint(msg.sender, tokensToMint);
+            }
+
+        // Track the user's bet (store the ETH amount / minted tokens)
+        userBets[marketId][msg.sender] += msg.value;
+
+        // Emit the BetPlaced event to log the bet
+        emit BetPlaced(msg.sender, msg.value, _betOutcome);
+    
     }
 
-    fallback() external {
-        revert();
+    // Payout distribution after a market resolves
+    function distributePayouts(uint256 marketId) external {
+        Market market = markets[marketId];
+
+        // Ensure the market is resolved
+        require(market.s_state() == Market.MarketState.Resolved, "Market not resolved");
+
+        Market.outcomeType winningOutcome = market.s_finalResolution();
+
+        uint256 totalYesBets = market.totalBets(Market.outcomeType.Yes);
+        uint256 totalNoBets = market.totalBets(Market.outcomeType.No);
+
+        uint256 totalPool = totalYesBets + totalNoBets;
+
+        // Calculate payout multiplier for winning outcome
+        uint256 payoutMultiplier = (winningOutcome == Market.outcomeType.Yes)
+            ? (totalPool * 1e18) / totalYesBets
+            : (totalPool * 1e18) / totalNoBets;
+
+        // Iterate over all users and distribute rewards
+        for (uint256 i = 0; i < market.getUsersCount(); i++) {
+            address userAddress = market.getUserByIndex(i);
+
+            if (market.getUserOutcome(userAddress) == winningOutcome) {
+                uint256 userBetAmount = userBets[marketId][userAddress];
+                uint256 payoutAmount = (userBetAmount * payoutMultiplier) / 1e18;
+
+                // Transfer payout to the user
+                payable(userAddress).transfer(payoutAmount);
+            }
+        }
     }
+
+    // Get a market's details
+    function getMarket(uint256 marketId) external view returns (Market) {
+        return markets[marketId];
+    }
+
+    // Event to log the placement of a bet
+    event BetPlaced(address indexed user, uint256 tokenAmount, Market.outcomeType betOutcome);
 }
